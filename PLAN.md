@@ -205,17 +205,21 @@ reales, no escribirlas desde cero.
   - *Urban Pulse Hybrid* (Híbrido / Compacto - $29,000)
 - [ ] **2.2** Actualizar los tipos `Car` en `src/types/agent-protocol.ts` para incluir parámetros avanzados de filtrado: `transmission`, `fuelType`, `year`, `featured`.
 
-#### Bloque 3: Panel de Filtros Avanzados Controlable por el Agente
-- [ ] **3.1** Extender el estado `filters` en `AgentUIContext` y `UIState`: `category`, `minPrice`, `maxPrice`, `fuelType`.
-- [ ] **3.2** Actualizar `CopilotIntegration.tsx`:
-  - Extender `useCopilotReadable` enviando el catálogo completo extendido y filtros activos.
-  - Extender `filterCatalog` action en `useCopilotAction` para aceptar `category`, `maxPrice`, `fuelType`.
-  - Crear la acción `setPriceRange` para ajustar límites de presupuesto por voz/chat.
-- [ ] **3.3** Diseñar la barra de filtros sobria en la vista de Showroom con selectores deslizantes / chips minimalistas.
+#### Bloque 3: Panel de Filtros Avanzados y Catálogo Integrado (Controlable por el Agente)
+- [ ] **3.1** Extender el estado `filters` en `AgentUIContext` y `UIState`: `category`, `minPrice`, `maxPrice`, `fuelType`, `searchQuery`.
+- [ ] **3.2** Crear la nueva Vista de Catálogo de Vehículos (`src/components/CarCatalog.tsx`) adaptada al layout SPA sin scroll:
+  - Barra superior de filtrado dinámico: Búsqueda libre por texto, Chips de Categoría, Slider de Precio y Filtro de Motorización.
+  - Grilla interactiva de autos filtrados en tiempo real con transiciones en `framer-motion`.
+  - Tarjetas sobrias con información técnica clave y acciones directas: *"Inspeccionar en Showroom"* y *"Agendar Prueba"*.
+- [ ] **3.3** Actualizar `CopilotIntegration.tsx`:
+  - Extender `useCopilotReadable` enviando el catálogo completo extendido, resultados filtrados y filtros activos.
+  - Extender `filterCatalog` action en `useCopilotAction` para aceptar `category`, `maxPrice`, `fuelType`, `searchQuery`.
+  - Al ejecutar `filterCatalog`, el agente puede navegar automáticamente a la vista de Catálogo (`'models'`) o filtrar en vivo si el usuario ya está allí.
+- [ ] **3.4** Crear la acción `setPriceRange` para ajustar límites de presupuesto por conversación con el agente.
 
 #### Bloque 4: Refinamiento Estético & Animaciones
-- [ ] **3.4** Rediseñar las fichas técnicas y visores de autos con micro-interacciones sutiles en `framer-motion`.
-- [ ] **3.5** Integrar feedback visual en la UI cuando el agente ejecuta una herramienta (glow sutil o indicación de filtro aplicado por IA).
+- [ ] **3.5** Rediseñar las fichas técnicas y visores de autos con micro-interacciones sutiles en `framer-motion`.
+- [ ] **3.6** Integrar feedback visual en la UI cuando el agente ejecuta una herramienta (indicador glowing *"Filtrado por Asistente IA"*).
 
 ---
 
