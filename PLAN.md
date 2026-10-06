@@ -1,6 +1,6 @@
 # Plan de Proyecto: Web Interactiva Controlada por Agente IA (Voz / Chat)
 
-> **Estado**: Fase 2 Completada (con defectos) / Fase 2.5 **Bloques 0 hechos** / Fase 3 bloqueada  
+> **Estado**: Fase 2 Completada / Fase 2.5 Bloques 0 OK / **Fase 2.6 Planificada (Rediseño SPA & Catálogo)** / Fase 3 en espera  
 > **Caso de Estudio**: Concesionaria de Vehículos Interactiva (NovaMotors)  
 > **Orquestador**: `ovni-agent` (LangGraph + router AG-UI *hand-rolled*, a reemplazar)  
 > ⚠️ La Fase 3 (Voz) está **bloqueada** hasta completar la Fase 2.5: hoy el agente no puede
@@ -182,6 +182,40 @@ reales, no escribirlas desde cero.
 - [ ] **4.5** Verificación end-to-end: pedirle a Eva "mostrame el SUV rojo" y confirmar que el showroom cambia de color.
 
 **Criterio de salida de la Fase 2.5:** (a) el chat muestra historial y recuerda turnos previos; (b) una CopilotAction invocada por el modelo cambia la UI; (c) no queda emisión de eventos AG-UI a mano en `ovni-agent`.
+
+---
+
+### 🎨 Fase 2.6: Evolución UI/UX SPA Profesional, Sobria y Extensión del Catálogo (NUEVA)
+
+**Objetivo.** Elevar el diseño visual de NovaMotors a un nivel *premium*, sobrio y sin scroll (Single Page Application pura con layout 100vh viewport-bound). Ampliar el catálogo a 6+ vehículos categorizados e incorporar un panel de filtros avanzado (categoría, rango de precio, tipo de motor/combustible) operable tanto de forma manual como por el Agente de IA.
+
+#### Bloque 1: Arquitectura Layout SPA Estricto (Sin Scroll)
+- [ ] **1.1** Reestructurar el contenedor principal a `h-screen overflow-hidden flex flex-col` con paleta de colores sobria y oscura (Slate/Zinc ultra-premium, acentos índigo/oro sutiles).
+- [ ] **1.2** Rediseñar el Header/Navbar con pestañas compactas y estado de sesión/moneda.
+- [ ] **1.3** Incorporar nuevas secciones al enum `UISection`: `'home' | 'showroom' | 'models' | 'finance' | 'contact'`.
+- [ ] **1.4** Crear vistas compactas adaptadas al layout viewport-bound para las secciones 'finance' (Calculadora de Financiación / Cuotas) y 'models' (Comparador/Grilla sin scroll con paginación o pestañas).
+
+#### Bloque 2: Extensión del Catálogo de Vehículos
+- [ ] **2.1** Expandir `src/data/cars.ts` con más variedad de modelos y categorías:
+  - *Apex Horizon SUV* (SUV - $42,000)
+  - *Volt GT Electric* (Electric - $55,000)
+  - *Luxe Prestige Sedan* (Sedan - $38,000)
+  - *CyberTrack EV* (Pickup / Electric - $68,000)
+  - *Starlight Cabriolet* (Deportivo - $72,000)
+  - *Urban Pulse Hybrid* (Híbrido / Compacto - $29,000)
+- [ ] **2.2** Actualizar los tipos `Car` en `src/types/agent-protocol.ts` para incluir parámetros avanzados de filtrado: `transmission`, `fuelType`, `year`, `featured`.
+
+#### Bloque 3: Panel de Filtros Avanzados Controlable por el Agente
+- [ ] **3.1** Extender el estado `filters` en `AgentUIContext` y `UIState`: `category`, `minPrice`, `maxPrice`, `fuelType`.
+- [ ] **3.2** Actualizar `CopilotIntegration.tsx`:
+  - Extender `useCopilotReadable` enviando el catálogo completo extendido y filtros activos.
+  - Extender `filterCatalog` action en `useCopilotAction` para aceptar `category`, `maxPrice`, `fuelType`.
+  - Crear la acción `setPriceRange` para ajustar límites de presupuesto por voz/chat.
+- [ ] **3.3** Diseñar la barra de filtros sobria en la vista de Showroom con selectores deslizantes / chips minimalistas.
+
+#### Bloque 4: Refinamiento Estético & Animaciones
+- [ ] **3.4** Rediseñar las fichas técnicas y visores de autos con micro-interacciones sutiles en `framer-motion`.
+- [ ] **3.5** Integrar feedback visual en la UI cuando el agente ejecuta una herramienta (glow sutil o indicación de filtro aplicado por IA).
 
 ---
 
