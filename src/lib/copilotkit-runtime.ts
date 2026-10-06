@@ -66,9 +66,17 @@ export const handlePost = async (req: NextRequest) => {
       body: rawBody ?? {},
     };
 
+    const headers = new Headers(req.headers);
+    if (process.env.OVNI_AGENT_ID) {
+      headers.set('x-agent-id', process.env.OVNI_AGENT_ID);
+    }
+    if (process.env.OVNI_CLIENT_ID) {
+      headers.set('x-client-id', process.env.OVNI_CLIENT_ID);
+    }
+
     const syntheticReq = new Request(req.url, {
       method: 'POST',
-      headers: req.headers,
+      headers,
       body: JSON.stringify(rpcBody),
     });
 
