@@ -24,9 +24,17 @@ const createHandler = () =>
 
 export const handleInfo = async (req: NextRequest) => {
   const { handleRequest } = createHandler();
+  const headers = new Headers({ 'content-type': 'application/json' });
+  if (process.env.OVNI_AGENT_ID) {
+    headers.set('x-agent-id', process.env.OVNI_AGENT_ID);
+  }
+  if (process.env.OVNI_CLIENT_ID) {
+    headers.set('x-client-id', process.env.OVNI_CLIENT_ID);
+  }
+
   const syntheticReq = new Request(req.url, {
     method: 'POST',
-    headers: { 'content-type': 'application/json' },
+    headers,
     body: JSON.stringify({ method: 'info' }),
   });
   return handleRequest(syntheticReq);
