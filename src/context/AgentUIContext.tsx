@@ -6,7 +6,6 @@ import { UIState, AgentUIAction } from '@/types/agent-protocol';
 interface AgentUIContextType {
   state: UIState;
   dispatch: (action: AgentUIAction) => void;
-  // Registra acciones de logs del agente para inspección en vivo
   agentLogs: string[];
   addAgentLog: (log: string) => void;
 }
@@ -14,15 +13,18 @@ interface AgentUIContextType {
 const initialUIState: UIState = {
   activeSection: 'home',
   selectedCarId: 'apex-suv',
-  selectedColor: '#1e293b',
+  selectedColor: '#0f172a',
   highlightedElementId: null,
   filters: {
     category: 'ALL',
     maxPrice: 100000,
+    fuelType: 'ALL',
+    searchQuery: '',
   },
   testDriveForm: {
     isOpen: false,
-  }
+  },
+  aiActionNotice: null,
 };
 
 const AgentUIContext = createContext<AgentUIContextType | undefined>(undefined);
@@ -53,6 +55,16 @@ export const AgentUIProvider = ({ children }: { children: ReactNode }) => {
             filters: {
               category: action.category ?? prev.filters.category,
               maxPrice: action.maxPrice ?? prev.filters.maxPrice,
+              fuelType: action.fuelType ?? prev.filters.fuelType,
+              searchQuery: action.searchQuery ?? prev.filters.searchQuery,
+            }
+          };
+        case 'SET_PRICE_RANGE':
+          return {
+            ...prev,
+            filters: {
+              ...prev.filters,
+              maxPrice: action.maxPrice,
             }
           };
         case 'OPEN_TEST_DRIVE':
@@ -76,6 +88,11 @@ export const AgentUIProvider = ({ children }: { children: ReactNode }) => {
               ...prev.testDriveForm,
               [action.field]: action.value
             }
+          };
+        case 'SET_AI_NOTICE':
+          return {
+            ...prev,
+            aiActionNotice: action.message
           };
         default:
           return prev;

@@ -5,7 +5,7 @@ import { useCopilotAction, useCopilotReadable } from '@copilotkit/react-core';
 import { CARS_DATA } from '@/data/cars';
 import type { UISection } from '@/types/agent-protocol';
 
-const SECTIONS: readonly string[] = ['home', 'showroom', 'test-drive', 'contact'];
+const SECTIONS: readonly string[] = ['home', 'showroom', 'models', 'finance', 'contact'];
 
 function toSection(value: unknown): UISection {
   return SECTIONS.includes(String(value))
@@ -16,83 +16,110 @@ function toSection(value: unknown): UISection {
 export function CopilotIntegration() {
   const { state, dispatch } = useAgentUI();
 
-  // 1. Exponer el estado de la UI a la IA (UI State Exposure)
+  // Exponer el estado de la UI a la IA (UI State Exposure)
   useCopilotReadable({
-    description: "Estado actual de la interfaz de la concesionaria de autos NovaMotors",
+    description: "Estado actual de la concesionaria NovaMotors y filtros activos",
     value: {
       activeSection: state.activeSection,
       selectedCarId: state.selectedCarId,
       selectedColor: state.selectedColor,
       filters: state.filters,
       testDriveForm: state.testDriveForm,
-      availableCars: CARS_DATA.map(c => ({ id: c.id, name: c.name, category: c.category, price: c.price }))
+      availableCars: CARS_DATA.map(c => ({
+        id: c.id,
+        name: c.name,
+        category: c.category,
+        price: c.price,
+        fuelType: c.fuelType,
+        year: c.year
+      }))
     }
   });
 
-  // 2. Registrar Copilot Actions (Tool Calls de UI)
+  // Copilot Actions (Tool Calls de UI)
   useCopilotAction({
     name: "navigateToSection",
-    description: "Cambia la sección visible del sitio. Usar SOLO si el usuario pide ver, ir a o mostrar una sección concreta (ej: 'llevame a contacto', 'mostrame el showroom'). No usar para saludar ni para preguntas de conocimiento.",
+    description: "Cambia la sección visible de la aplicación. Opciones: home, showroom, models, finance, contact. Usar cuando el usuario pida ir a una sección o explorar el catálogo/modelos/financiación.",
     parameters: [
-      { name: "section", type: "string", description: "Sección a la que navegar: home, showroom o contact", required: true }
+      { name: "section", type: "string", description: "Sección a la que navegar: home, showroom, models, finance, contact", required: true }
     ],
     handler: async ({ section }) => {
-      dispatch({ type: "NAVIGATE", section: toSection(section) });
+      const targetSec = toSection(section);
+      dispatch({ type: "NAVIGATE", section: targetSec });
+      dispatch({ type: "SET_AI_NOTICE", message: `Navegando a ${section.toUpperCase()}` });
+      setTimeout(() => dispatch({ type: "SET_AI_NOTICE", message: null }), 3500);
       return `Navegado exitosamente a la sección ${section}`;
     }
   });
 
   useCopilotAction({
     name: "selectCarModel",
-    description: "Muestra un auto concreto en el visor. Usar SOLO si el usuario pide ver o comparar un modelo específico.",
+    description: "Selecciona e inspecciona un modelo concreto en el Showroom visual.",
     parameters: [
-      { name: "carId", type: "string", description: "ID del auto (apex-suv, volt-gt, luxe-sedan)", required: true }
+      { name: "carId", type: "string", description: "ID del auto (apex-suv, volt-gt, luxe-sedan, cyber-track, starlight-cabrio, urban-pulse)", required: true }
     ],
     handler: async ({ carId }) => {
       dispatch({ type: "NAVIGATE", section: "showroom" });
       dispatch({ type: "SELECT_CAR", carId });
-      return `Auto ${carId} seleccionado en el visor`;
+      dispatch({ type: "SET_AI_NOTICE", message: `Modelo seleccionado: ${carId}` });
+      setTimeout(() => dispatch({ type: "SET_AI_NOTICE", message: null }), 3500);
+      return `Auto ${carId} cargado en el visor del showroom`;
     }
   });
 
   useCopilotAction({
     name: "changeCarColor",
-    description: "Cambia el color del auto en pantalla. Usar SOLO si el usuario pide un color o cambiar el color del vehículo.",
+    description: "Cambia el color exterior del automóvil actualmente cargado en el showroom.",
     parameters: [
-      { name: "colorHex", type: "string", description: "Código Hexadecimal o nombre del color (ej. #dc2626 para rojo, #0284c7 para azul)", required: true }
+      { name: "colorHex", type: "string", description: "Código Hexadecimal del color (ej. #0f172a, #991b1b, #0284c7, #b91c1c)", required: true }
     ],
     handler: async ({ colorHex }) => {
       dispatch({ type: "CHANGE_COLOR", color: colorHex });
-      return `Color del vehículo cambiado a ${colorHex}`;
+      dispatch({ type: "SET_AI_NOTICE", message: `Color modificado a ${colorHex}` });
+      setTimeout(() => dispatch({ type: "SET_AI_NOTICE", message: null }), 3500);
+      return `Color exterior cambiado a ${colorHex}`;
     }
   });
 
   useCopilotAction({
     name: "filterCatalog",
-    description: "Filtra el catálogo por categoría. Usar SOLO si el usuario pide filtrar, buscar o ver autos de un tipo (ej: 'mostrame los SUV').",
+    description: "Filtra la grilla de vehículos por categoría, tipo de motor, búsqueda de texto o presupuesto máximo.",
     parameters: [
-      { name: "category", type: "string", description: "Categoría: ALL, SUV, Electric, Sedan", required: true }
+      { name: "category", type: "string", description: "Categoría: ALL, SUV, Electric, Sedan, Deportivo, Hibrido" },
+      { name: "maxPrice", type: "number", description: "Presupuesto máximo estimado" },
+      { name: "fuelType", type: "string", description: "Motorización: ALL, Gasolina, Electrico, Hibrido" },
+      { name: "searchQuery", type: "string", description: "Término de búsqueda por texto" }
     ],
-    handler: async ({ category }) => {
-      dispatch({ type: "NAVIGATE", section: "showroom" });
-      dispatch({ type: "FILTER_CARS", category });
-      return `Catálogo filtrado por categoría ${category}`;
+    handler: async ({ category, maxPrice, fuelType, searchQuery }) => {
+      dispatch({ type: "NAVIGATE", section: "models" });
+      dispatch({
+        type: "FILTER_CARS",
+        category,
+        maxPrice,
+        fuelType,
+        searchQuery
+      });
+      dispatch({ type: "SET_AI_NOTICE", message: `Filtros aplicados al catálogo por Asistente IA` });
+      setTimeout(() => dispatch({ type: "SET_AI_NOTICE", message: null }), 3500);
+      return `Filtros de catálogo aplicados exitosamente`;
     }
   });
 
   useCopilotAction({
     name: "openTestDriveForm",
-    description: "Abre el formulario de prueba de manejo. Usar SOLO si el usuario quiere agendar o reservar una prueba de manejo.",
+    description: "Abre el formulario para agendar o reservar una prueba de manejo.",
     parameters: [
-      { name: "carId", type: "string", description: "ID del auto a probar" },
-      { name: "date", type: "string", description: "Fecha en formato YYYY-MM-DD" },
-      { name: "name", type: "string", description: "Nombre del cliente" }
+      { name: "carId", type: "string", description: "ID del automóvil a agendar" },
+      { name: "date", type: "string", description: "Fecha de la cita (YYYY-MM-DD)" },
+      { name: "name", type: "string", description: "Nombre completo del solicitante" }
     ],
     handler: async ({ carId, date, name }) => {
       dispatch({ type: "OPEN_TEST_DRIVE", carId });
       if (date) dispatch({ type: "FILL_TEST_DRIVE", field: "date", value: date });
       if (name) dispatch({ type: "FILL_TEST_DRIVE", field: "name", value: name });
-      return `Formulario de prueba de manejo abierto y configurado`;
+      dispatch({ type: "SET_AI_NOTICE", message: `Formulario de prueba de manejo activado` });
+      setTimeout(() => dispatch({ type: "SET_AI_NOTICE", message: null }), 3500);
+      return `Formulario de prueba de manejo abierto correctamente`;
     }
   });
 
