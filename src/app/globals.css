@@ -1,26 +1,165 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #f7f7f5;
+  --foreground: #18181b;
+  --surface: #ffffff;
+  --border: #e7e5e4;
+  --muted: #71717a;
+  --accent: #18181b;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-line: var(--border);
+  --color-muted: var(--muted);
+  --color-accent: var(--accent);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html,
+body {
+  height: 100%;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans), ui-sans-serif, system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Scrollbars discretas */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #d4d4d8;
+  border-radius: 9999px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+
+/* Fijamos los tokens del tema CLARO dentro del panel del agente. Así el texto del
+   input queda oscuro sobre el fondo blanco incluso si el sistema/browser está en
+   modo oscuro (evita texto blanco sobre input blanco en mobile). */
+.nv-agent {
+  --copilot-kit-background-color: #ffffff;
+  --copilot-kit-input-background-color: #ffffff;
+  --copilot-kit-secondary-color: #ffffff;
+  --copilot-kit-secondary-contrast-color: #18181b;
+  --copilot-kit-primary-color: #18181b;
+  --copilot-kit-contrast-color: #ffffff;
+  --copilot-kit-separator-color: #e7e5e4;
+  --copilot-kit-muted-color: #d4d4d8;
+}
+.nv-agent .copilotKitInput > textarea {
+  color: #18181b;
+}
+.nv-agent .copilotKitInput > textarea::placeholder {
+  color: #a1a1aa;
+}
+
+/* Panel del agente integrado: ocultamos el chrome por defecto del chat de CopilotKit
+   y adaptamos su superficie al diseño minimalista claro. */
+.nv-agent .copilotKitHeader {
+  display: none;
+}
+.nv-agent .copilotKitChatBody,
+.nv-agent .copilotKitMessages,
+.nv-agent .copilotKitMessagesContainer {
+  background: transparent;
+}
+.nv-agent .copilotKitInputContainer {
+  background: transparent;
+  border-top: 1px solid var(--border);
+}
+.nv-agent .copilotKitInput {
+  border-radius: 12px;
+}
+.nv-agent .copilotKitChat,
+.nv-agent .copilotKitChatBody {
+  height: 100%;
+  background: transparent;
+}
+.nv-agent .copilotKitChat {
+  display: flex;
+  flex-direction: column;
+}
+
+/* ---------------------------------------------------------------------------
+   Mobile: chat flotante TRANSPARENTE.
+   - El panel no tiene fondo: sólo los últimos mensajes como burbujas vidrio.
+   - El input queda como barra sólida pegada al borde inferior de la pantalla.
+   - Ocupa como máximo un 40% de alto (lo fija el componente).
+--------------------------------------------------------------------------- */
+@media (max-width: 1023px) {
+  .nv-agent .copilotKitChat,
+  .nv-agent .copilotKitChatBody,
+  .nv-agent .copilotKitMessages,
+  .nv-agent .copilotKitMessagesContainer,
+  .nv-agent .copilotKitMessagesFooter {
+    background: transparent;
+  }
+
+  /* Los mensajes viejos se desvanecen arriba: se leen sólo los últimos. */
+  .nv-agent .copilotKitMessages {
+    padding-top: 0.25rem;
+    -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 16%, #000 100%);
+    mask-image: linear-gradient(to bottom, transparent 0, #000 16%, #000 100%);
+  }
+
+  /* Burbujas de vidrio semitransparente. */
+  .nv-agent .copilotKitMessage {
+    background: rgba(255, 255, 255, 0.62);
+    -webkit-backdrop-filter: blur(14px);
+    backdrop-filter: blur(14px);
+    border: 1px solid rgba(255, 255, 255, 0.55);
+    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
+    max-width: 86%;
+  }
+  .nv-agent .copilotKitMessage.copilotKitUserMessage {
+    background: rgba(24, 24, 27, 0.72);
+    color: #ffffff;
+    border-color: rgba(255, 255, 255, 0.16);
+  }
+  .nv-agent .copilotKitMessage.copilotKitAssistantMessage {
+    color: #18181b;
+  }
+
+  /* Barra de input sólida hasta el borde de la pantalla. */
+  .nv-agent .copilotKitInputContainer {
+    background: #ffffff;
+    border-top: 1px solid var(--border);
+    box-shadow: 0 -8px 24px rgba(15, 23, 42, 0.06);
+    padding-bottom: max(env(safe-area-inset-bottom), 10px);
+  }
+  .nv-agent .copilotKitInput {
+    min-height: 44px;
+    width: 100%;
+    padding: 7px 14px;
+    border-radius: 9999px;
+    background: #f4f4f5;
+  }
+
+  /* Colapsado: se conserva únicamente la barra de input sólida. */
+  .nv-agent-collapsed .copilotKitMessages,
+  .nv-agent-collapsed .copilotKitMessagesFooter {
+    display: none;
+  }
+}
+
+/* Safe areas para mobile */
+@supports (padding: max(0px)) {
+  .safe-bottom {
+    padding-bottom: max(env(safe-area-inset-bottom), 0px);
+  }
 }

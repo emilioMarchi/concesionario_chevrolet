@@ -3,8 +3,8 @@
 import React, { useState } from 'react';
 import { useAgentUI } from '@/context/AgentUIContext';
 import { CARS_DATA } from '@/data/cars';
-import { motion } from 'framer-motion';
-import { Calculator, Calendar, CheckCircle2, DollarSign } from 'lucide-react';
+import { formatPrice } from '@/lib/format';
+import { Calculator, Calendar, CheckCircle2 } from 'lucide-react';
 
 export function FinanceCalculator() {
   const { state, dispatch } = useAgentUI();
@@ -13,7 +13,7 @@ export function FinanceCalculator() {
   const [months, setMonths] = useState<number>(36);
   const [downPaymentPercent, setDownPaymentPercent] = useState<number>(20);
 
-  const price = selectedCar.price;
+  const price = selectedCar.price ?? 0;
   const downPayment = (price * downPaymentPercent) / 100;
   const loanAmount = price - downPayment;
 
@@ -24,8 +24,8 @@ export function FinanceCalculator() {
     (Math.pow(1 + monthlyInterestRate, months) - 1);
 
   return (
-    <div className="h-full max-w-5xl mx-auto p-6 flex flex-col justify-center overflow-hidden">
-      <div className="bg-slate-900/90 border border-slate-800/90 rounded-3xl p-8 shadow-2xl backdrop-blur-md grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
+    <div className="h-full max-w-5xl mx-auto p-3 sm:p-6 flex flex-col justify-center overflow-y-auto custom-scrollbar">
+      <div className="bg-slate-900/90 border border-slate-800/90 rounded-3xl p-4 sm:p-8 shadow-2xl backdrop-blur-md grid grid-cols-1 md:grid-cols-2 gap-5 sm:gap-8 items-center">
         {/* Columna Izquierda: Configuración */}
         <div className="space-y-6">
           <div>
@@ -85,18 +85,22 @@ export function FinanceCalculator() {
         <div className="bg-slate-950/80 border border-slate-800 rounded-2xl p-6 flex flex-col justify-between space-y-6 relative overflow-hidden">
           <div className="space-y-4">
             <span className="text-[11px] uppercase tracking-wider text-slate-400 font-semibold">Estimación Mensual</span>
-            <div className="flex items-baseline gap-1">
-              <span className="text-4xl font-extrabold text-white font-mono tracking-tight">
-                ${Math.round(monthlyPayment).toLocaleString()}
-              </span>
-              <span className="text-xs text-slate-400">/ mes</span>
-            </div>
-
-            <div className="space-y-2 pt-4 border-t border-slate-800 text-xs text-slate-300">
-              <div className="flex justify-between">
-                <span className="text-slate-400">Precio de Lista:</span>
-                <span className="font-mono">${price.toLocaleString()}</span>
+            {selectedCar.price == null ? (
+              <div className="py-3 text-sm text-slate-300">Precio a consultar con asesoramiento.</div>
+            ) : (
+              <div className="flex items-baseline gap-1">
+                <span className="text-4xl font-extrabold text-white font-mono tracking-tight">
+                  ${Math.round(monthlyPayment).toLocaleString()}
+                </span>
+                <span className="text-xs text-slate-400">/ mes</span>
               </div>
+            )}
+
+<div className="space-y-2 pt-4 border-t border-slate-800 text-xs text-slate-300">
+                <div className="flex justify-between">
+                  <span className="text-slate-400">Precio de Lista:</span>
+                  <span className="font-mono">{formatPrice(selectedCar.price)}</span>
+                </div>
               <div className="flex justify-between">
                 <span className="text-slate-400">Monto a Financiar:</span>
                 <span className="font-mono">${Math.round(loanAmount).toLocaleString()}</span>

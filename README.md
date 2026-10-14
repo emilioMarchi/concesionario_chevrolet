@@ -1,36 +1,63 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# web-ia — NovaMotors (Next.js + CopilotKit)
 
-## Getting Started
+Sitio SPA con catálogo de vehículos, financiación y asistente IA (CopilotKit)
+conectado al backend `ovni-agent`.
 
-First, run the development server:
+## Variables de entorno
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+Copia `.env.example` a `.env.local` y completalo:
+
+| Variable | Descripción |
+| --- | --- |
+| `OVNI_AGENT_URL` | URL base del backend. **Obligatoria en producción** (si falta, `/api/copilotkit` responde 500). Dev: `http://localhost:8080`. Prod: `https://<subdominio>.ngrok-free.app` |
+| `OVNI_AGENT_ID` | Header `x-agent-id` que resuelve el agente en Firestore. Obligatorio en prod |
+| `OVNI_CLIENT_ID` | Header `x-client-id` que resuelve el cliente/organización. Obligatorio en prod |
+| `ALLOWED_ORIGINS` | Orígenes permitidos para llamar a `/api/copilotkit` desde otro dominio (separados por coma). El dominio propio funciona siempre (same-origin). Vacío = sin orígenes cruzados |
+
+Ningún secreto va al repo: `.env*` está en `.gitignore` excepto `.env.example`.
+
+### Cómo fluye el CORS
+
+```
+navegador ──► /api/copilotkit (Vercel, mismo origen, sin CORS)
+                    │  servidor a servidor (sin header Origin)
+                    ▼
+             OVNI_AGENT_URL/copilotkit  (ovni-agent, en tu PC detrás de ngrok)
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+El navegador nunca habla directo con ngrok, por eso el tramo Vercel → ngrok no
+está sujeto a CORS. `ALLOWED_ORIGINS` solo se usa si exponés `/api/copilotkit`
+a otro dominio (widget embebido, preview, etc.); en ese caso se responden los
+preflight `OPTIONS` y los headers `Access-Control-Allow-*`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Desarrollo local
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+npm install
+npm run dev     # http://localhost:3000
+```
 
-## Learn More
+El backend `ovni-agent` debe correr en `http://localhost:8080`.
 
-To learn more about Next.js, take a look at the following resources:
+## Deploy en Vercel + ngrok en tu PC
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+1. Servidor del agente corriendo localmente (`ovni-agent`, puerto 8080).
+2. Exponelo por ngrok: `ngrok http 8080` → copia la URL `https://xxx.ngrok-free.app`.
+3. En Vercel → Settings → Environment Variables, cargá:
+   - `OVNI_AGENT_URL=https://xxx.ngrok-free.app`
+   - `OVNI_AGENT_ID=agent_...`
+   - `OVNI_CLIENT_ID=org_...`
+   - `ALLOWED_ORIGINS=` (solo si algo va a llamar a la API desde otro dominio)
+4. Deploy. La URL ngrok cambia cada reinicio en el plan free: actualizala en
+   Vercel y redeployeá (o usá un dominio fijo con ngrok).
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+> `ovni-agent` también aplica CORS del lado del backend (orígenes base +
+> dominios de admins en Firestore). Como el tramo Vercel → ngrok no manda
+> `Origin`, no requiere cambios.
 
-## Deploy on Vercel
+## Comandos
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```bash
+npm run lint
+npm run build
+```

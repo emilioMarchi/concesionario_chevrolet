@@ -1,36 +1,37 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
+import clsx from 'clsx';
 import { useAgentUI } from '@/context/AgentUIContext';
 import { CARS_DATA } from '@/data/cars';
+import { formatPrice } from '@/lib/format';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search, SlidersHorizontal, Calendar, Eye, ShieldCheck, Zap } from 'lucide-react';
 import type { CarCategory, FuelType } from '@/types/agent-protocol';
 
 const CATEGORIES: { label: string; value: string }[] = [
   { label: 'Todos', value: 'ALL' },
+  { label: 'Autos', value: 'Auto' },
   { label: 'SUVs', value: 'SUV' },
-  { label: 'Eléctricos', value: 'Electric' },
-  { label: 'Sedán', value: 'Sedan' },
-  { label: 'Deportivos', value: 'Deportivo' },
-  { label: 'Híbridos', value: 'Hibrido' },
+  { label: 'Camionetas', value: 'Pick-up' },
 ];
 
 const FUELS: { label: string; value: string }[] = [
   { label: 'Cualquier Motor', value: 'ALL' },
-  { label: '100% Eléctrico', value: 'Electrico' },
-  { label: 'Gasolina Performance', value: 'Gasolina' },
-  { label: 'Híbrido Eficiente', value: 'Hibrido' },
+  { label: 'Nafta', value: 'Gasolina' },
+  { label: 'Diésel', value: 'Diesel' },
+  { label: 'Híbrido', value: 'Hibrido' },
 ];
 
 export function CarCatalog() {
   const { state, dispatch } = useAgentUI();
   const { filters } = state;
+  const [showFilters, setShowFilters] = useState(false);
 
   const filteredCars = CARS_DATA.filter((car) => {
     const matchesCategory = filters.category === 'ALL' || car.category === filters.category;
     const matchesFuel = filters.fuelType === 'ALL' || car.fuelType === filters.fuelType;
-    const matchesPrice = car.price <= filters.maxPrice;
+    const matchesPrice = car.price == null || car.price <= filters.maxPrice;
     const matchesQuery =
       !filters.searchQuery ||
       car.name.toLowerCase().includes(filters.searchQuery.toLowerCase()) ||
@@ -40,25 +41,25 @@ export function CarCatalog() {
   });
 
   return (
-    <div className="h-full flex flex-col p-6 max-w-7xl mx-auto w-full space-y-6 overflow-hidden">
-      {/* Header & Barra de Filtros Sobria */}
-      <div className="bg-slate-900/80 border border-slate-800/80 backdrop-blur-md rounded-2xl p-5 flex flex-col gap-4 shadow-xl shrink-0">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div>
-            <h1 className="text-xl font-bold text-white tracking-tight flex items-center gap-2">
-              Inventario & Modelos NovaMotors
+      <div className="min-h-full flex flex-col p-3 sm:p-4 md:p-6 max-w-7xl mx-auto w-full gap-3 sm:gap-4">
+      {/* Header & Barra de Filtros Compacta */}
+      <div className="bg-slate-900/80 border border-slate-800/80 backdrop-blur-md rounded-2xl p-3 sm:p-4 flex flex-col gap-3 shadow-xl shrink-0">
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <h1 className="text-base sm:text-xl font-bold text-white tracking-tight truncate">
+              Modelos NovaMotors
             </h1>
-            <p className="text-xs text-slate-400 mt-0.5">
-              Explora nuestra flota ejecutiva. Filtra manualmente o pídeselo al asistente por voz/chat.
+            <p className="hidden sm:block text-xs text-slate-400 mt-0.5">
+              Filtra manualmente o pídeselo al asistente por chat.
             </p>
           </div>
 
           {/* Búsqueda Directa */}
-          <div className="relative min-w-[240px]">
+          <div className="relative flex-1 sm:flex-none sm:min-w-[240px] max-w-[260px]">
             <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
             <input
               type="text"
-              placeholder="Buscar por nombre o modelo..."
+              placeholder="Buscar..."
               value={filters.searchQuery}
               onChange={(e) => dispatch({ type: 'FILTER_CARS', searchQuery: e.target.value })}
               className="w-full bg-slate-950/80 border border-slate-800 rounded-xl pl-9 pr-3 py-1.5 text-xs text-white focus:outline-none focus:border-zinc-500 placeholder:text-slate-500"
@@ -66,15 +67,14 @@ export function CarCatalog() {
           </div>
         </div>
 
-        {/* Chips de Categorías y Filtros Avanzados */}
-        <div className="flex flex-wrap items-center justify-between gap-4 pt-2 border-t border-slate-800/60 text-xs">
-          {/* Categorías */}
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+        {/* Categorías + toggle de filtros avanzados */}
+        <div className="flex items-center gap-2 pt-2 border-t border-slate-800/60">
+          <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none flex-1">
             {CATEGORIES.map((cat) => (
               <button
                 key={cat.value}
                 onClick={() => dispatch({ type: 'FILTER_CARS', category: cat.value as CarCategory | 'ALL' })}
-                className={`px-3 py-1 rounded-lg text-xs transition-all whitespace-nowrap ${
+                className={`px-2.5 py-1 rounded-lg text-xs transition-all whitespace-nowrap ${
                   filters.category === cat.value
                     ? 'bg-zinc-200 text-zinc-950 font-semibold shadow'
                     : 'bg-slate-800/80 text-slate-300 hover:bg-slate-700/80'
@@ -85,54 +85,68 @@ export function CarCatalog() {
             ))}
           </div>
 
-          {/* Selector de Combustible / Motorización y Rango de Precio */}
-          <div className="flex flex-wrap items-center gap-4">
-            <div className="flex items-center gap-2">
-              <span className="text-slate-400 flex items-center gap-1">
-                <SlidersHorizontal className="w-3.5 h-3.5" /> Motor:
-              </span>
-              <select
-                value={filters.fuelType}
-                onChange={(e) => dispatch({ type: 'FILTER_CARS', fuelType: e.target.value as FuelType | 'ALL' })}
-                className="bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1 text-xs text-slate-200 focus:outline-none"
-              >
-                {FUELS.map((f) => (
-                  <option key={f.value} value={f.value}>{f.label}</option>
-                ))}
-              </select>
-            </div>
+          <button
+            onClick={() => setShowFilters((v) => !v)}
+            className={`lg:hidden shrink-0 px-2.5 py-1 rounded-lg text-xs flex items-center gap-1.5 transition-colors ${
+              showFilters ? 'bg-zinc-200 text-zinc-950 font-semibold' : 'bg-slate-800/80 text-slate-300'
+            }`}
+          >
+            <SlidersHorizontal className="w-3.5 h-3.5" /> Filtros
+          </button>
+        </div>
 
-            <div className="flex items-center gap-2">
-              <span className="text-slate-400">Máx. Precio:</span>
-              <input
-                type="range"
-                min="25000"
-                max="100000"
-                step="5000"
-                value={filters.maxPrice}
-                onChange={(e) => dispatch({ type: 'SET_PRICE_RANGE', maxPrice: Number(e.target.value) })}
-                className="accent-zinc-300 w-24 cursor-pointer"
-              />
-              <span className="text-zinc-200 font-mono text-xs font-semibold">${filters.maxPrice.toLocaleString()}</span>
-            </div>
+        {/* Filtros avanzados: colapsables en mobile, siempre visibles en desktop */}
+        <div
+          className={clsx(
+            'flex flex-wrap items-center gap-x-4 gap-y-2 text-xs',
+            showFilters ? 'flex' : 'hidden lg:flex'
+          )}
+        >
+          <div className="flex items-center gap-2">
+            <span className="text-slate-400 flex items-center gap-1">
+              <SlidersHorizontal className="w-3.5 h-3.5" /> Motor:
+            </span>
+            <select
+              value={filters.fuelType}
+              onChange={(e) => dispatch({ type: 'FILTER_CARS', fuelType: e.target.value as FuelType | 'ALL' })}
+              className="bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1 text-xs text-slate-200 focus:outline-none"
+            >
+              {FUELS.map((f) => (
+                <option key={f.value} value={f.value}>{f.label}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex items-center gap-2 flex-1 min-w-[180px]">
+            <span className="text-slate-400 whitespace-nowrap">Máx. Precio:</span>
+            <input
+              type="range"
+              min="20000000"
+              max="50000000"
+              step="1000000"
+              value={filters.maxPrice}
+              onChange={(e) => dispatch({ type: 'SET_PRICE_RANGE', maxPrice: Number(e.target.value) })}
+              className="accent-zinc-300 flex-1 min-w-[80px] cursor-pointer"
+            />
+            <span className="text-zinc-200 font-mono text-xs font-semibold whitespace-nowrap">${filters.maxPrice.toLocaleString()}</span>
           </div>
         </div>
       </div>
 
-      {/* Grilla de Autos Adaptada al Layout SPA sin Scroll vertical en body */}
-      <div className="flex-1 overflow-y-auto pr-1 space-y-4 custom-scrollbar">
+      {/* Grilla de Autos */}
+      <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar">
         {filteredCars.length === 0 ? (
           <div className="h-64 flex flex-col items-center justify-center border border-dashed border-slate-800 rounded-2xl text-center p-6">
             <p className="text-slate-400 text-sm">No se encontraron vehículos que coincidan con los filtros seleccionados.</p>
             <button
-              onClick={() => dispatch({ type: 'FILTER_CARS', category: 'ALL', maxPrice: 100000, fuelType: 'ALL', searchQuery: '' })}
+              onClick={() => dispatch({ type: 'FILTER_CARS', category: 'ALL', maxPrice: 50000000, fuelType: 'ALL', searchQuery: '' })}
               className="mt-3 px-4 py-1.5 bg-slate-800 hover:bg-slate-700 text-xs text-zinc-300 rounded-xl transition-colors"
             >
               Restablecer Filtros
             </button>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-5">
             <AnimatePresence mode="popLayout">
               {filteredCars.map((car) => (
                 <motion.div
@@ -146,7 +160,7 @@ export function CarCatalog() {
                 >
                   <div>
                     {/* Imagen y Badges */}
-                    <div className="relative h-44 overflow-hidden bg-slate-950">
+                    <div className="relative h-40 sm:h-44 overflow-hidden bg-slate-950">
                       <img
                         src={car.image}
                         alt={car.name}
@@ -163,7 +177,7 @@ export function CarCatalog() {
                         )}
                       </div>
                       <div className="absolute bottom-3 right-3 px-2.5 py-1 bg-slate-950/90 backdrop-blur-md font-mono text-xs font-bold text-white rounded-lg border border-slate-800">
-                        ${car.price.toLocaleString()}
+                        {formatPrice(car.price)}
                       </div>
                     </div>
 
@@ -178,10 +192,10 @@ export function CarCatalog() {
                       <div className="grid grid-cols-2 gap-2 text-[11px] text-slate-300 pt-2 border-t border-slate-800/80">
                         <div className="flex items-center gap-1.5">
                           <Zap className="w-3.5 h-3.5 text-zinc-400" />
-                          <span>{car.specs.power}</span>
+                          <span>{car.specs.power || car.specs.engine || '—'}</span>
                         </div>
                         <div className="text-slate-400 text-right">
-                          <span>{car.specs.rangeOrConsumption}</span>
+                          <span>{car.specs.torque || car.transmission}</span>
                         </div>
                       </div>
                     </div>

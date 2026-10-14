@@ -1,7 +1,8 @@
 'use client';
 
-import React, { createContext, useContext, useState, ReactNode } from 'react';
-import { UIState, AgentUIAction } from '@/types/agent-protocol';
+import React, { createContext, useContext, useState, useCallback, useMemo, ReactNode } from 'react';
+import { UIState, AgentUIAction, AgentMobileSnap } from '@/types/agent-protocol';
+import { CARS_DATA } from '@/data/cars';
 
 interface AgentUIContextType {
   state: UIState;
@@ -12,18 +13,21 @@ interface AgentUIContextType {
 
 const initialUIState: UIState = {
   activeSection: 'home',
-  selectedCarId: 'apex-suv',
-  selectedColor: '#0f172a',
+  selectedCarId: CARS_DATA[0]?.id ?? null,
+  selectedColor: CARS_DATA[0]?.colors[0]?.hex ?? '',
   highlightedElementId: null,
   filters: {
     category: 'ALL',
-    maxPrice: 100000,
+    maxPrice: 50000000,
     fuelType: 'ALL',
     searchQuery: '',
   },
   testDriveForm: {
     isOpen: false,
   },
+  agentOpen: true,
+  agentMobileSnap: 'peek' as AgentMobileSnap,
+  pendingPrompt: null,
   aiActionNotice: null,
 };
 
@@ -33,11 +37,11 @@ export const AgentUIProvider = ({ children }: { children: ReactNode }) => {
   const [state, setState] = useState<UIState>(initialUIState);
   const [agentLogs, setAgentLogs] = useState<string[]>([]);
 
-  const addAgentLog = (log: string) => {
+  const addAgentLog = useCallback((log: string) => {
     setAgentLogs((prev) => [log, ...prev.slice(0, 19)]);
-  };
+  }, []);
 
-  const dispatch = (action: AgentUIAction) => {
+  const dispatch = useCallback((action: AgentUIAction) => {
     addAgentLog(`Action: ${action.type} -> ${JSON.stringify(action)}`);
     setState((prev) => {
       switch (action.type) {
@@ -89,6 +93,39 @@ export const AgentUIProvider = ({ children }: { children: ReactNode }) => {
               [action.field]: action.value
             }
           };
+        case 'OPEN_AGENT':
+          return { ...prev, agentOpen: true, agentMobileSnap: 'peek' };
+        case 'CLOSE_AGENT':
+          return { ...prev, agentOpen: false, agentMobileSnap: 'closed' };
+        case 'TOGGLE_AGENT':
+          return {
+            ...prev,
+            agentOpen: !prev.agentOpen,
+            agentMobileSnap: prev.agentMobileSnap === 'closed' ? 'peek' : 'closed'
+          };
+        case 'SET_AGENT_MOBILE_SNAP':
+          return { ...prev, agentMobileSnap: action.snap };
+        case 'OPEN_AGENT_MOBILE_PEAK':
+          return { ...prev, agentMobileSnap: 'peek', agentOpen: true };
+        case 'EXPAND_AGENT_MOBILE':
+          return { ...prev, agentMobileSnap: 'expanded', agentOpen: true };
+        case 'CLOSE_AGENT_MOBILE':
+          return { ...prev, agentMobileSnap: 'closed', agentOpen: true };
+        case 'TOGGLE_AGENT_MOBILE':
+          return {
+            ...prev,
+            agentMobileSnap: prev.agentMobileSnap === 'closed' ? 'peek' : 'closed',
+            agentOpen: true
+          };
+        case 'ASK_AGENT':
+          return {
+            ...prev,
+            agentOpen: true,
+            agentMobileSnap: 'expanded',
+            pendingPrompt: action.message
+          };
+        case 'CLEAR_PENDING_PROMPT':
+          return { ...prev, pendingPrompt: null };
         case 'SET_AI_NOTICE':
           return {
             ...prev,
@@ -98,10 +135,15 @@ export const AgentUIProvider = ({ children }: { children: ReactNode }) => {
           return prev;
       }
     });
-  };
+  }, [addAgentLog]);
+
+  const value = useMemo(
+    () => ({ state, dispatch, agentLogs, addAgentLog }),
+    [state, dispatch, agentLogs, addAgentLog]
+  );
 
   return (
-    <AgentUIContext.Provider value={{ state, dispatch, agentLogs, addAgentLog }}>
+    <AgentUIContext.Provider value={value}>
       {children}
     </AgentUIContext.Provider>
   );
