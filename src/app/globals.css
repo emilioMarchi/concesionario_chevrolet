@@ -95,68 +95,6 @@ body {
   flex-direction: column;
 }
 
-/* ---------------------------------------------------------------------------
-   Mobile: chat flotante TRANSPARENTE.
-   - El panel no tiene fondo: sólo los últimos mensajes como burbujas vidrio.
-   - El input queda como barra sólida pegada al borde inferior de la pantalla.
-   - Ocupa como máximo un 40% de alto (lo fija el componente).
---------------------------------------------------------------------------- */
-@media (max-width: 1023px) {
-  .nv-agent .copilotKitChat,
-  .nv-agent .copilotKitChatBody,
-  .nv-agent .copilotKitMessages,
-  .nv-agent .copilotKitMessagesContainer,
-  .nv-agent .copilotKitMessagesFooter {
-    background: transparent;
-  }
-
-  /* Los mensajes viejos se desvanecen arriba: se leen sólo los últimos. */
-  .nv-agent .copilotKitMessages {
-    padding-top: 0.25rem;
-    -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 16%, #000 100%);
-    mask-image: linear-gradient(to bottom, transparent 0, #000 16%, #000 100%);
-  }
-
-  /* Burbujas de vidrio semitransparente. */
-  .nv-agent .copilotKitMessage {
-    background: rgba(255, 255, 255, 0.62);
-    -webkit-backdrop-filter: blur(14px);
-    backdrop-filter: blur(14px);
-    border: 1px solid rgba(255, 255, 255, 0.55);
-    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
-    max-width: 86%;
-  }
-  .nv-agent .copilotKitMessage.copilotKitUserMessage {
-    background: rgba(24, 24, 27, 0.72);
-    color: #ffffff;
-    border-color: rgba(255, 255, 255, 0.16);
-  }
-  .nv-agent .copilotKitMessage.copilotKitAssistantMessage {
-    color: #18181b;
-  }
-
-  /* Barra de input sólida hasta el borde de la pantalla. */
-  .nv-agent .copilotKitInputContainer {
-    background: #ffffff;
-    border-top: 1px solid var(--border);
-    box-shadow: 0 -8px 24px rgba(15, 23, 42, 0.06);
-    padding-bottom: max(env(safe-area-inset-bottom), 10px);
-  }
-  .nv-agent .copilotKitInput {
-    min-height: 44px;
-    width: 100%;
-    padding: 7px 14px;
-    border-radius: 9999px;
-    background: #f4f4f5;
-  }
-
-  /* Colapsado: se conserva únicamente la barra de input sólida. */
-  .nv-agent-collapsed .copilotKitMessages,
-  .nv-agent-collapsed .copilotKitMessagesFooter {
-    display: none;
-  }
-}
-
 /* Safe areas para mobile */
 @supports (padding: max(0px)) {
   .safe-bottom {

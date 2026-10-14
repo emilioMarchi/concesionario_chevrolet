@@ -8,8 +8,8 @@ import { DealershipShowroom } from '@/components/DealershipShowroom';
 import { CarCatalog } from '@/components/CarCatalog';
 import { FinanceCalculator } from '@/components/FinanceCalculator';
 import { CopilotIntegration } from '@/components/CopilotIntegration';
-import { CopilotKit } from '@copilotkit/react-core';
-import '@copilotkit/react-ui/styles.css';
+import { CopilotKitProvider } from '@copilotkit/react-core/v2';
+import '@copilotkit/react-ui/v2/styles.css';
 import {
   Car,
   PhoneCall,
@@ -81,7 +81,11 @@ function TopBar() {
           onClick={() =>
             window.innerWidth >= 1024
               ? dispatch({ type: 'TOGGLE_AGENT' })
-              : dispatch({ type: 'TOGGLE_AGENT_MOBILE' })
+              : dispatch(
+                  state.agentMobileSnap === 'expanded'
+                    ? { type: 'SET_AGENT_MOBILE_SNAP', snap: 'peek' }
+                    : { type: 'EXPAND_AGENT_MOBILE' }
+                )
           }
           className="shrink-0 px-4 py-2 rounded-full border border-zinc-200 hover:border-zinc-300 bg-white text-sm text-zinc-800 transition-colors flex items-center gap-2"
         >
@@ -234,9 +238,11 @@ function MobileQuickMenu() {
   const { state, dispatch } = useAgentUI();
   const [open, setOpen] = useState(false);
 
-  // Se apoya justo por encima del chat (que ocupa hasta el 40% inferior).
+  // Se apoya justo por encima del chat. Expandido ≈ 78dvh; colapsado sólo la barra de input.
   const bottomOffset =
-    state.agentMobileSnap === 'closed' ? 'calc(6rem + 1rem)' : 'calc(40dvh + 1rem)';
+    state.agentMobileSnap === 'expanded'
+      ? 'calc(min(78dvh, 620px) + 1rem)'
+      : 'calc(4.75rem + env(safe-area-inset-bottom, 0px))';
 
   const handleNav = (section: (typeof NAV_ITEMS)[number]['section']) => {
     dispatch({ type: 'NAVIGATE', section });
@@ -284,7 +290,11 @@ function MobileQuickMenu() {
 
 export default function Home() {
   return (
-    <CopilotKit runtimeUrl="/api/copilotkit" agent="default" useSingleEndpoint>
+    <CopilotKitProvider
+      runtimeUrl="/api/copilotkit"
+      agentId="default"
+      publicApiKey={process.env.COPILOT_API_KEY || undefined}
+    >
       <AgentUIProvider>
         <CopilotIntegration />
         <div className="h-[100dvh] w-screen flex flex-col lg:flex-row bg-[var(--background)] text-zinc-900 overflow-hidden relative">
@@ -296,6 +306,6 @@ export default function Home() {
           <AgentSidebar />
         </div>
       </AgentUIProvider>
-    </CopilotKit>
+    </CopilotKitProvider>
   );
 }

@@ -1,142 +1,114 @@
 import {
+  CopilotKitIntelligence,
   CopilotRuntime,
-  copilotRuntimeNextJSAppRouterEndpoint,
-} from '@copilotkit/runtime';
-import { LangGraphHttpAgent } from '@copilotkit/runtime/langgraph';
-import { NextRequest, NextResponse } from 'next/server';
+  createCopilotRuntimeHandler,
+  CopilotRuntimeUser,
+  McpAppsConfig,
+} from '@copilotkit/runtime/v2';
+import { HttpAgent } from '@ag-ui/client';
+import { NextRequest } from 'next/server';
 import { preflightResponse, withCors } from '@/lib/cors';
+import { buildAgentHeaders, resolveAgentUrl } from '@/lib/ovni-agent';
+import { OvniTranscriptionService } from '@/lib/transcription-service';
 
-const ENDPOINT = '/api/copilotkit';
+const BASE_PATH = '/api/copilotkit';
+const ANON_USER_COOKIE = 'nv_uid';
 
-// La URL del backend es configurable por entorno. En desarrollo cae a
-// localhost; en producción es obligatoria (evita deployar apuntando al PC local
-// por error). El backend expone el agente en `${OVNI_AGENT_URL}/copilotkit`.
-function resolveAgentUrl(): string {
-  const url = process.env.OVNI_AGENT_URL?.trim();
-  if (url) return url.replace(/\/+$/, '');
-  if (process.env.NODE_ENV === 'production') {
-    throw new Error(
-      'OVNI_AGENT_URL no está configurada. Definila en las variables de entorno ' +
-        'de producción (ej. https://<subdominio>.ngrok-free.app).'
-    );
-  }
-  return 'http://localhost:8080';
+type RuntimeHandler = (request: Request) => Promise<Response>;
+
+function buildMcpConfig(): McpAppsConfig | undefined {
+  const url = process.env.MCP_SERVER_URL;
+  if (!url) return undefined;
+  // MCPClientConfigHTTP shape: { type: 'http', url, headers?, serverId? }
+  return {
+    servers: [
+      { type: 'http', url, headers: undefined, serverId: undefined },
+    ],
+  } satisfies McpAppsConfig;
 }
 
-// El backend resuelve el agente (Firestore) con el header `x-agent-id`. Si no
-// lo recibe, cae a un default hardcodeado y todas las apps hablan con el mismo
-// agente sin importar qué se cambie en .env.local.
-// `ngrok-skip-browser-warning` evita el interstitial de ngrok en el plan free.
-function buildAgentHeaders(agentUrl: string): Record<string, string> {
-  const headers: Record<string, string> = {};
-  if (process.env.OVNI_AGENT_ID) headers['x-agent-id'] = process.env.OVNI_AGENT_ID;
-  if (process.env.OVNI_CLIENT_ID) headers['x-client-id'] = process.env.OVNI_CLIENT_ID;
-  if (agentUrl.includes('ngrok')) headers['ngrok-skip-browser-warning'] = 'true';
-  return headers;
-}
+let cachedHandler: RuntimeHandler | null = null;
 
-// Se construye de forma perezosa para que la configuración de entorno se lea en
-// runtime (y no durante `next build`), y se cachea para reutilizar la instancia.
-let cachedRuntime: CopilotRuntime | null = null;
+function getHandler(): RuntimeHandler {
+  if (cachedHandler) return cachedHandler;
 
-function getRuntime(): CopilotRuntime {
-  if (cachedRuntime) return cachedRuntime;
   const agentUrl = resolveAgentUrl();
-  cachedRuntime = new CopilotRuntime({
-    agents: {
-      default: new LangGraphHttpAgent({
-        agentId: 'default',
-        description: 'Agente OVNI - asistente de ventas y navegación de NovaMotors',
-        url: `${agentUrl}/copilotkit`,
-        headers: buildAgentHeaders(agentUrl),
-      }),
-    },
-  });
-  return cachedRuntime;
+
+  // Optional Intelligence mode: requires CPK_INTELLIGENCE_API_KEY (project key).
+  // Public cpk-* keys are client-side only and do NOT authenticate Intelligence.
+  const intelligenceApiKey = process.env.CPK_INTELLIGENCE_API_KEY;
+
+  let runtime: CopilotRuntime;
+  let handler: ReturnType<typeof createCopilotRuntimeHandler>;
+
+  const mcpConfig = buildMcpConfig();
+
+  if (intelligenceApiKey) {
+    // Intelligence runtime: durable threads, memory, realtime subscriptions.
+    const intelligence = new CopilotKitIntelligence({ apiKey: intelligenceApiKey });
+    runtime = new CopilotRuntime({
+      agents: {
+        default: new HttpAgent({
+          url: `${agentUrl}/copilotkit`,
+          headers: buildAgentHeaders(agentUrl),
+        }),
+      },
+      licenseToken: process.env.COPILOTKIT_LICENSE_TOKEN,
+      transcriptionService: new OvniTranscriptionService(),
+      intelligence,
+      identifyUser: async (request: Request): Promise<CopilotRuntimeUser> => {
+        const cookie = request.headers.get('cookie') ?? '';
+        const match = cookie.match(new RegExp(`${ANON_USER_COOKIE}=([^;]+)`));
+        const userId = match?.[1] ?? crypto.randomUUID();
+        return { id: userId, name: `Usuario ${userId.slice(0, 8)}` };
+      },
+      memory: {
+        access: async ({ consumer }) => ({
+          user: consumer === 'agent' ? 'read-write' : 'read',
+          project: 'read',
+        }),
+      },
+      mcpApps: mcpConfig,
+    });
+    handler = createCopilotRuntimeHandler({
+      runtime,
+      basePath: BASE_PATH,
+      mode: 'multi-route',
+    });
+  } else {
+    // SSE mode with local in-memory thread endpoints (no durable persistence).
+    runtime = new CopilotRuntime({
+      agents: {
+        default: new HttpAgent({
+          url: `${agentUrl}/copilotkit`,
+          headers: buildAgentHeaders(agentUrl),
+        }),
+      },
+      licenseToken: process.env.COPILOTKIT_LICENSE_TOKEN,
+      transcriptionService: new OvniTranscriptionService(),
+      mcpApps: mcpConfig,
+    });
+    handler = createCopilotRuntimeHandler({
+      runtime,
+      basePath: BASE_PATH,
+      mode: 'multi-route',
+    });
+  }
+
+  cachedHandler = handler;
+  return cachedHandler;
 }
 
-const createHandler = () =>
-  copilotRuntimeNextJSAppRouterEndpoint({ runtime: getRuntime(), endpoint: ENDPOINT });
-
-export const handleInfo = async (req: NextRequest) => {
-  const { handleRequest } = createHandler();
-  const headers = new Headers({
-    'content-type': 'application/json',
-    ...buildAgentHeaders(resolveAgentUrl()),
-  });
-
-  const syntheticReq = new Request(req.url, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify({ method: 'info' }),
-  });
-  return withCors(req, await handleRequest(syntheticReq));
-};
-
-export const handlePost = async (req: NextRequest) => {
-  try {
-    const { handleRequest } = createHandler();
-    const agentHeaders = buildAgentHeaders(resolveAgentUrl());
-
-    let rawBody: unknown;
-    try {
-      rawBody = await req.clone().json();
-    } catch {
-      rawBody = undefined;
-    }
-
-    const isRpc =
-      !!rawBody &&
-      typeof rawBody === 'object' &&
-      'method' in (rawBody as Record<string, unknown>);
-
-    // Los headers de agente se resuelven ANTES de las dos ramas: la rama RPC
-    // devolvía `handleRequest(req)` con los headers del navegador, que nunca
-    // traen `x-agent-id`.
-    const forwardHeaders = new Headers(req.headers);
-    for (const [key, value] of Object.entries(agentHeaders)) {
-      forwardHeaders.set(key, value);
-    }
-
-    if (isRpc) {
-      const res = await handleRequest(
-        new Request(req.url, {
-          method: 'POST',
-          headers: forwardHeaders,
-          body: JSON.stringify(rawBody),
-        }),
-      );
-      return withCors(req, res);
-    }
-
-    const url = new URL(req.url);
-    const parts = url.pathname.split('/');
-    const agentIdx = parts.indexOf('agent');
-    const agentId =
-      agentIdx !== -1 && parts[agentIdx + 1] ? parts[agentIdx + 1] : 'default';
-    const action =
-      agentIdx !== -1 && parts[agentIdx + 2] ? parts[agentIdx + 2] : 'connect';
-
-    const rpcBody = {
-      method: `agent/${action}`,
-      params: { agentId },
-      body: rawBody ?? {},
-    };
-
-    const syntheticReq = new Request(req.url, {
-      method: 'POST',
-      headers: forwardHeaders,
-      body: JSON.stringify(rpcBody),
-    });
-
-    return withCors(req, await handleRequest(syntheticReq));
-  } catch (error) {
-    console.error('Error en ruta copilotkit:', error);
-    return withCors(
-      req,
-      NextResponse.json({ success: false, error: 'Error interno' }, { status: 500 })
-    );
+async function delegate(req: NextRequest): Promise<Response> {
+  // Set anonymous user cookie if not present (for Intelligence identifyUser).
+  const res = await withCors(req, await getHandler()(req));
+  if (!req.headers.get('cookie')?.includes(`${ANON_USER_COOKIE}=`)) {
+    const userId = crypto.randomUUID();
+    res.headers.append('Set-Cookie', `${ANON_USER_COOKIE}=${userId}; Path=/; SameSite=Lax; Max-Age=31536000; HttpOnly; Secure`);
   }
-};
+  return res;
+}
 
+export const handleGet = (req: NextRequest) => delegate(req);
+export const handlePost = (req: NextRequest) => delegate(req);
 export const handleOptions = async (req: NextRequest) => preflightResponse(req);

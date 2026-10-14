@@ -9,7 +9,8 @@ Copia `.env.example` a `.env.local` y completalo:
 
 | Variable | Descripción |
 | --- | --- |
-| `OVNI_AGENT_URL` | URL base del backend. **Obligatoria en producción** (si falta, `/api/copilotkit` responde 500). Dev: `http://localhost:8080`. Prod: `https://<subdominio>.ngrok-free.app` |
+| `OVNI_AGENT_URL_DEV` | URL base del backend en **desarrollo** (ej. `http://localhost:8080`). Si falta, cae a `http://localhost:8080` |
+| `OVNI_AGENT_URL_PROD` | URL base del backend en **producción** (ej. `https://<subdominio>.ngrok-free.app`). **Obligatoria en prod** (si falta, `/api/copilotkit` responde 500) |
 | `OVNI_AGENT_ID` | Header `x-agent-id` que resuelve el agente en Firestore. Obligatorio en prod |
 | `OVNI_CLIENT_ID` | Header `x-client-id` que resuelve el cliente/organización. Obligatorio en prod |
 | `ALLOWED_ORIGINS` | Orígenes permitidos para llamar a `/api/copilotkit` desde otro dominio (separados por coma). El dominio propio funciona siempre (same-origin). Vacío = sin orígenes cruzados |
@@ -22,7 +23,7 @@ Ningún secreto va al repo: `.env*` está en `.gitignore` excepto `.env.example`
 navegador ──► /api/copilotkit (Vercel, mismo origen, sin CORS)
                     │  servidor a servidor (sin header Origin)
                     ▼
-             OVNI_AGENT_URL/copilotkit  (ovni-agent, en tu PC detrás de ngrok)
+             OVNI_AGENT_URL_DEV/PROD/copilotkit  (ovni-agent, en tu PC detrás de ngrok)
 ```
 
 El navegador nunca habla directo con ngrok, por eso el tramo Vercel → ngrok no
@@ -44,7 +45,7 @@ El backend `ovni-agent` debe correr en `http://localhost:8080`.
 1. Servidor del agente corriendo localmente (`ovni-agent`, puerto 8080).
 2. Exponelo por ngrok: `ngrok http 8080` → copia la URL `https://xxx.ngrok-free.app`.
 3. En Vercel → Settings → Environment Variables, cargá:
-   - `OVNI_AGENT_URL=https://xxx.ngrok-free.app`
+   - `OVNI_AGENT_URL_PROD=https://xxx.ngrok-free.app`
    - `OVNI_AGENT_ID=agent_...`
    - `OVNI_CLIENT_ID=org_...`
    - `ALLOWED_ORIGINS=` (solo si algo va a llamar a la API desde otro dominio)
