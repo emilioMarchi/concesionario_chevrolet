@@ -1,24 +1,40 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { CopilotChat, useThreads } from '@copilotkit/react-core/v2';
 import { useAgentUI } from '@/context/AgentUIContext';
 import { MobileAgentChat } from '@/components/MobileAgentChat';
-import { Sparkles, X, Plus, Clock, Archive } from 'lucide-react';
+import { Sparkles, X, Plus, Clock, Archive, Trash2, Check } from 'lucide-react';
 
 function ThreadPicker({
-  threads,
+  latestThread,
   isLoading,
   activeThreadId,
   onSelectThread,
   startNewThread,
+  deleteThread,
+  disabled,
+  error,
 }: {
-  threads: import('@copilotkit/react-core/v2').Thread[];
+  latestThread?: import('@copilotkit/react-core/v2').Thread;
   isLoading: boolean;
   activeThreadId?: string;
   onSelectThread: (threadId: string) => void;
   startNewThread: () => void;
+  deleteThread: (threadId: string) => Promise<void>;
+  disabled?: boolean;
+  error?: string | null;
 }) {
+  const [confirmingId, setConfirmingId] = useState<string | null>(null);
+
+  const handleDelete = async (threadId: string) => {
+    try {
+      await deleteThread(threadId);
+    } finally {
+      setConfirmingId(null);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="p-3 border-b border-zinc-200">
@@ -36,38 +52,78 @@ function ThreadPicker({
         <p className="text-xs font-medium text-zinc-600 uppercase tracking-wider">Historial</p>
         <button
           onClick={startNewThread}
+          disabled={disabled}
           aria-label="Nueva conversación"
-          className="p-1.5 rounded-lg text-zinc-500 hover:text-zinc-700 hover:bg-zinc-200 transition-colors"
+          className="p-1.5 rounded-lg text-zinc-500 hover:text-zinc-700 hover:bg-zinc-200 transition-colors disabled:opacity-50"
           title="Nueva conversación"
         >
           <Plus className="w-4 h-4" />
         </button>
       </div>
-      {threads.length === 0 ? (
+      {!latestThread ? (
         <div className="px-3 pb-3 text-center text-sm text-zinc-400">
           Sin conversaciones previas
         </div>
       ) : (
         <ul className="px-2 pb-2 space-y-1 max-h-48 overflow-y-auto">
-          {threads.map((thread) => (
-            <li
-              key={thread.id}
-              onClick={() => onSelectThread(thread.id)}
-              className={`flex items-center gap-2 px-2 py-1.5 rounded-lg text-sm cursor-pointer transition-colors ${
-                thread.id === activeThreadId
-                  ? 'bg-emerald-50 text-emerald-700'
-                  : 'text-zinc-700 hover:bg-zinc-200'
-              }`}
-            >
-              <Clock className="w-3.5 h-3.5 flex-shrink-0" />
-              <span className="truncate flex-1">
-                {thread.name ?? 'Conversación sin título'}
+          <li
+            key={latestThread.id}
+            onClick={() => onSelectThread(latestThread.id)}
+            className={`flex items-center gap-2 px-2 py-1.5 rounded-lg text-sm cursor-pointer transition-colors ${
+              latestThread.id === activeThreadId
+                ? 'bg-emerald-50 text-emerald-700'
+                : 'text-zinc-700 hover:bg-zinc-200'
+            }`}
+          >
+            <Clock className="w-3.5 h-3.5 flex-shrink-0" />
+            <span className="truncate flex-1">
+              {latestThread.name ?? 'Conversación sin título'}
+            </span>
+            {latestThread.archived && <Archive className="w-3.5 h-3.5" />}
+            {confirmingId === latestThread.id ? (
+              <span className="flex items-center gap-0.5 shrink-0">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    void handleDelete(latestThread.id);
+                  }}
+                  disabled={disabled}
+                  aria-label="Confirmar eliminación"
+                  title="Confirmar eliminación"
+                  className="p-1 rounded-md text-red-600 hover:bg-red-100 disabled:opacity-50"
+                >
+                  <Check className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setConfirmingId(null);
+                  }}
+                  aria-label="Cancelar eliminación"
+                  title="Cancelar"
+                  className="p-1 rounded-md text-zinc-500 hover:bg-zinc-200"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
               </span>
-              {thread.archived && <Archive className="w-3.5 h-3.5" />}
-            </li>
-          ))}
+            ) : (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setConfirmingId(latestThread.id);
+                }}
+                disabled={disabled}
+                aria-label="Eliminar conversación"
+                title="Eliminar conversación"
+                className="p-1 rounded-md text-zinc-400 hover:text-red-600 hover:bg-red-50 disabled:opacity-50 shrink-0"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </li>
         </ul>
       )}
+      {error && <div className="px-3 pb-2 text-xs text-red-600">{error}</div>}
     </div>
   );
 }
@@ -75,7 +131,39 @@ function ThreadPicker({
 export function AgentSidebar() {
   const { state, dispatch } = useAgentUI();
   const open = state.agentOpen;
-  const [activeThreadId, setActiveThreadId] = useState<string | undefined>();
+
+  const { threads, isLoading, startNewThread, deleteThread, isMutating, listError } = useThreads({
+    agentId: 'default',
+  });
+
+  // Siempre arranca en la conversación más reciente. El override sólo cambia
+  // cuando el usuario elige otro hilo o pide uno nuevo; si el hilo elegido se
+  // borra, vuelve a caer en el más reciente (o en la bienvenida si no queda ninguno).
+  const [threadOverride, setThreadOverride] = useState<
+    { kind: 'thread'; id: string } | { kind: 'new' } | null
+  >(null);
+
+  const latestThread = useMemo(() => {
+    const sorted = [...threads].sort(
+      (a, b) => new Date(b.updatedAt ?? 0).getTime() - new Date(a.updatedAt ?? 0).getTime()
+    );
+    return sorted[0];
+  }, [threads]);
+
+  const activeThreadId =
+    threadOverride?.kind === 'new'
+      ? undefined
+      : threadOverride?.kind === 'thread' && threads.some((t) => t.id === threadOverride.id)
+        ? threadOverride.id
+        : latestThread?.id;
+
+  const handleSelectThread = (threadId: string) =>
+    setThreadOverride({ kind: 'thread', id: threadId });
+
+  const handleStartNewThread = () => {
+    setThreadOverride({ kind: 'new' });
+    startNewThread();
+  };
 
   // Montamos una sola instancia de chat (desktop nativo o mobile propio) para
   // evitar que dos paneles compartan el agente y dupliquen mensajes/renders.
@@ -89,8 +177,6 @@ export function AgentSidebar() {
   }, []);
 
   const close = () => dispatch({ type: 'CLOSE_AGENT' });
-
-  const { threads, isLoading, startNewThread } = useThreads({ agentId: 'default' });
 
   const chatEl = (
     <CopilotChat
@@ -134,11 +220,14 @@ export function AgentSidebar() {
             </button>
           </div>
           <ThreadPicker
-            threads={threads}
+            latestThread={latestThread}
             isLoading={isLoading}
             activeThreadId={activeThreadId}
-            onSelectThread={setActiveThreadId}
-            startNewThread={startNewThread}
+            onSelectThread={handleSelectThread}
+            startNewThread={handleStartNewThread}
+            deleteThread={deleteThread}
+            disabled={isMutating}
+            error={listError ? listError.message : null}
           />
           <div className="flex-1 min-h-0">{chatEl}</div>
         </aside>
