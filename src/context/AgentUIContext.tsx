@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, useCallback, useMemo, ReactNode } from 'react';
 import { UIState, AgentUIAction, AgentMobileSnap } from '@/types/agent-protocol';
 import { CARS_DATA } from '@/data/cars';
+import { trackUIAction } from '@/lib/leads/client';
 
 interface AgentUIContextType {
   state: UIState;
@@ -43,6 +44,7 @@ export const AgentUIProvider = ({ children }: { children: ReactNode }) => {
 
   const dispatch = useCallback((action: AgentUIAction) => {
     addAgentLog(`Action: ${action.type} -> ${JSON.stringify(action)}`);
+    trackUIAction({ type: action.type, name: action.type, payload: action });
     setState((prev) => {
       switch (action.type) {
         case 'NAVIGATE':

@@ -10,9 +10,11 @@ import { NextRequest } from 'next/server';
 import { preflightResponse, withCors } from '@/lib/cors';
 import { buildAgentHeaders, resolveAgentUrl } from '@/lib/ovni-agent';
 import { OvniTranscriptionService } from '@/lib/transcription-service';
+import { AGENT_ID, ANON_USER_COOKIE, anonUserCookie, isMemoryEnabled, normalizeUserId } from '@/lib/intelligence';
+import { recordVisitor } from '@/lib/leads/visitors';
+import { scheduleSync } from '@/lib/leads/auto-sync';
 
 const BASE_PATH = '/api/copilotkit';
-const ANON_USER_COOKIE = 'nv_uid';
 
 type RuntimeHandler = (request: Request) => Promise<Response>;
 
@@ -46,6 +48,19 @@ function getHandler(): RuntimeHandler {
   if (intelligenceApiKey) {
     // Intelligence runtime: durable threads, memory, realtime subscriptions.
     const intelligence = new CopilotKitIntelligence({ apiKey: intelligenceApiKey });
+    // F4: al crearse/actualizarse un thread, registramos al visitante y
+    // programamos un ETL diferido para que el panel de leads se refresque solo.
+    intelligence.onThreadCreated((thread) => {
+      const userId = normalizeUserId(thread.createdById);
+      if (!userId) return;
+      void recordVisitor({ userId, agentId: AGENT_ID, threadIds: [thread.id] }).catch(() => {});
+      scheduleSync(userId);
+    });
+    intelligence.onThreadUpdated((thread) => {
+      const userId = normalizeUserId(thread.createdById);
+      if (!userId) return;
+      scheduleSync(userId);
+    });
     runtime = new CopilotRuntime({
       agents: {
         default: new HttpAgent({
@@ -60,14 +75,20 @@ function getHandler(): RuntimeHandler {
         const cookie = request.headers.get('cookie') ?? '';
         const match = cookie.match(new RegExp(`${ANON_USER_COOKIE}=([^;]+)`));
         const userId = match?.[1] ?? crypto.randomUUID();
+        // Fire-and-forget: no debe bloquear el handshake del runtime.
+        void recordVisitor({ userId, agentId: AGENT_ID }).catch(() => {});
         return { id: userId, name: `Usuario ${userId.slice(0, 8)}` };
       },
-      memory: {
-        access: async ({ consumer }) => ({
-          user: consumer === 'agent' ? 'read-write' : 'read',
-          project: 'read',
-        }),
-      },
+      // La memoria es opt-in: si la licencia no la incluye, omitirla evita el
+      // 403 MEMORY_NOT_ENTITLED y el attach del MCP managed (no habilitado).
+      memory: isMemoryEnabled()
+        ? {
+            access: async ({ consumer }) => ({
+              user: consumer === 'agent' ? 'read-write' : 'read',
+              project: 'read',
+            }),
+          }
+        : undefined,
       mcpApps: mcpConfig,
     });
     handler = createCopilotRuntimeHandler({
@@ -104,7 +125,7 @@ async function delegate(req: NextRequest): Promise<Response> {
   const res = await withCors(req, await getHandler()(req));
   if (!req.headers.get('cookie')?.includes(`${ANON_USER_COOKIE}=`)) {
     const userId = crypto.randomUUID();
-    res.headers.append('Set-Cookie', `${ANON_USER_COOKIE}=${userId}; Path=/; SameSite=Lax; Max-Age=31536000; HttpOnly; Secure`);
+    res.headers.append('Set-Cookie', anonUserCookie(userId));
   }
   return res;
 }

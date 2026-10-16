@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { ToolCallStatus } from '@copilotkit/react-core/v2';
-import { CheckCircle2, Loader2, Car as CarIcon, SlidersHorizontal, Calendar } from 'lucide-react';
+import { CheckCircle2, Loader2, Car as CarIcon, SlidersHorizontal, Calendar, FileText } from 'lucide-react';
 import { CARS_DATA } from '@/data/cars';
 
 // Vistas generativas para las tool calls de UI: en vez del JSON crudo, el chat
@@ -61,6 +61,31 @@ export function SelectCarToolView({ args, status }: { args: { carId?: string }; 
   return (
     <Shell title={done ? 'Modelo en el visor' : 'Cargando modelo'} icon={<CarIcon className="h-4 w-4" />} done={done}>
       <p className="mt-1 text-zinc-600">{carName(args.carId)}</p>
+    </Shell>
+  );
+}
+
+export function VehicleInfoToolView({
+  args,
+  status,
+}: {
+  args: { carId?: string; detail?: string };
+  status: ToolCallStatus;
+}) {
+  const done = isDone(status);
+  const isAll = !args.carId || args.carId === 'all';
+  return (
+    <Shell
+      title={done ? 'Ficha consultada' : 'Consultando ficha'}
+      icon={<FileText className="h-4 w-4" />}
+      done={done}
+    >
+      <div className="mt-1 space-y-0.5 text-zinc-600">
+        <p>{isAll ? 'Todo el catálogo' : carName(args.carId)}</p>
+        {args.detail && args.detail !== 'all' && (
+          <p className="text-xs text-zinc-500">Detalle: {args.detail}</p>
+        )}
+      </div>
     </Shell>
   );
 }

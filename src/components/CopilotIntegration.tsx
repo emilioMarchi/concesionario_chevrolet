@@ -20,6 +20,7 @@ import {
   NavigateToolView,
   OpenTestDriveToolView,
   SelectCarToolView,
+  VehicleInfoToolView,
 } from '@/components/AgentToolViews';
 
 const SECTIONS: readonly string[] = ['home', 'showroom', 'models', 'finance', 'contact'];
@@ -107,6 +108,7 @@ export function CopilotIntegration() {
     handler: async ({ carId, detail }) => {
       return getVehicleInfo(typeof carId === 'string' ? carId : undefined, typeof detail === 'string' ? detail : undefined);
     },
+    render: VehicleInfoToolView,
   });
 
   useFrontendTool({

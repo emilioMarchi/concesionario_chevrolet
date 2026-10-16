@@ -1,9 +1,48 @@
 # Plan: Captura de Telemetría y Generación de Leads Calificados
 
-> **Estado**: Planificado (F0–F8 pendientes)
+> **Estado**: F0–F3, F5 y F7 (MVP) implementadas; F4/F6 y endurecimiento pendientes. Ver §0.
 > **Alcance**: `web-ia` (Next.js) captura identidad + recorrido UI y hace ETL desde CopilotKit Intelligence hacia Firestore propio; `ovni-agent` (LangGraph) ya persiste y clasifica conversaciones.
 > **Relacionado**: `PLAN-COPLOTKIT-V2.md` (migración v2 / Intelligence), `PLAN-INTEGRACION.md` (catálogo), `PLAN.md` (proyecto global).
 > **Objetivo**: convertir la conversación + el recorrido por la UI en **leads calificados** (contacto, intención, scoring) reutilizando la data que CopilotKit ya guarda, sin depender de un vendor de analytics externo.
+
+---
+
+## 0. Estado de implementación
+
+### Hecho
+- **F0** — `src/lib/intelligence.ts`: singleton `CopilotKitIntelligence`, `AGENT_ID='default'`, `ANON_USER_COOKIE='nv_uid'`, lectura de `userId` desde cookie.
+- **F1** — `identifyUser` en `src/lib/copilotkit-runtime.ts` llama (fire-and-forget) a `recordVisitor` (`src/lib/leads/visitors.ts`).
+- **F2** — `src/lib/leads/client.ts` (queue + flush a `/api/telemetry`) invocado desde `dispatch` en `src/context/AgentUIContext.tsx`; ruta `src/app/api/telemetry/route.ts`.
+- **F3** — ETL en `src/lib/leads/etl.ts` (`runEtl`), ruta `POST /api/etl/intelligence` (protegida por `ETL_SECRET` opcional) y `POST /api/admin/sync` (protegida por login).
+- **F5** — Calificación heurística en `src/lib/leads/qualify.ts` (intenciones, temas, sentimiento, extracción de email/teléfono/nombre, `leadScore`).
+- **F4** — Auto-sync diferido: `src/lib/leads/auto-sync.ts` (`scheduleSync` con debounce ~8s) invocado desde `/api/telemetry` y desde los listeners `onThreadCreated/onThreadUpdated` del runtime (`src/lib/copilotkit-runtime.ts`). Desactivable con `AUTO_SYNC_DISABLED`.
+- **F6** — Webhook de leads calientes: `src/lib/leads/notify.ts` (`notifyHotLead`) disparado en el ETL una sola vez (dedupe por `notifiedAt`, umbral `LEAD_HOT_THRESHOLD`, `LEAD_WEBHOOK_URL`/`LEAD_WEBHOOK_AUTH`). Preserva `notes` y `status='contacted'` entre recálculos.
+- **F7 (MVP)** — Backoffice: `src/proxy.ts` (auth por cookie), `src/lib/admin/auth.ts`, login `src/app/admin/login`, panel `src/app/admin/(panel)/{page,leads,leads/[visitorId]}`, componentes `src/components/admin/*`, read APIs `/api/admin/*`.
+- **Persistencia** — `src/lib/firebase-admin.ts` (Firestore con degradación a memoria) + `src/lib/leads/store.ts` (colecciones `cpk_visitors`, `cpk_events`, `cpk_conversations`, `leads`).
+- **Deps** — añadidas `firebase-admin`, `server-only`; `firebase-admin` en `serverExternalPackages`.
+- **Verificación** — `tsc --noEmit` OK, `eslint` sin errores, `next build` OK.
+
+### Verificado end-to-end (local)
+- `.env.local` con `GOOGLE_APPLICATION_CREDENTIALS` → Firestore del proyecto `agent-ai-db`: OK.
+- `POST /api/telemetry` (con cookie `nv_uid`) → escribe `cpk_visitors` + `cpk_events`: OK.
+- `POST /api/admin/login` (contraseña) + `POST /api/admin/sync` → ETL crea `leads` con contacto extraído del recorrido UI (score 95, `type=lead`, `status=hot`): OK.
+- **F4**: sólo con `POST /api/telemetry` (sin sync manual), a los ~14s el lead apareció solo en Firestore (auto-sync): OK.
+- **F6**: mismo flujo disparó el webhook `{event:'lead.hot', lead, visitor}` con contacto completo; un segundo sync **no** lo repitió (dedupe por `notifiedAt`): OK.
+- Páginas `/admin`, `/admin/leads`, `/admin/leads/[visitorId]` y read APIs `/api/admin/*`: OK (200).
+
+### Bugs corregidos durante la verificación
+- `firebase-admin.ts`: `require('node:fs')` dinámico fallaba en el bundle del server → reemplazado por `import { readFileSync } from 'node:fs'`.
+- `firebase-admin.ts`: `db.settings()` repetido tras HMR lanzaba "already initialized" y degradaba a memoria → ahora tolera re-init.
+- `visitor.threadIds` podía ser `undefined` (visitantes creados por telemetría) → normalizado en `listVisitors` y accesos defensivos (evita 500 en `/api/admin/leads`).
+
+### Limitación detectada (bloquea parte de F5)
+- La memoria de Intelligence responde **403 `MEMORY_NOT_ENTITLED`** ("Memory is not enabled for this organization or license"). El ETL lo toleraba pero ensuciaba los logs. Resuelto: la memoria es **opt-in** con `INTELLIGENCE_MEMORY_ENABLED=true`; con el flag apagado se omiten las lecturas de memoria y el attach del MCP managed, y el ETL sigue con threads + eventos. La calificación se deriva de los mensajes del thread y del recorrido UI (ya implementado con eventos).
+
+### Pendiente
+- **Endurecimiento** — límite de tasa en `/api/telemetry`, sincronización programada (cron) además del auto-sync por actividad, manejo del primer request sin cookie `nv_uid` (hoy el `userId` del primer handshake es efímero y distinto del que setea la respuesta).
+- **F8** — Tests automatizados y verificación smoke con credenciales reales.
+
+> Nota Next 16: se usa la nueva convención `proxy.ts` (reemplaza `middleware.ts`, runtime Node). No soporta `edge`.
 
 ---
 
