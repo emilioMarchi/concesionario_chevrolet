@@ -33,6 +33,11 @@ yarn-error.log*
 # env files (can opt-in for committing if needed)
 .env*
 !.env.example
+!.env.runtime.example
+
+# runtime service deploy artifacts
+/runtime-deploy/
+/runtime-deploy.tar.gz
 
 # vercel
 .vercel

@@ -1,8 +1,10 @@
-import { handleGet, handleOptions, handlePost } from '@/lib/copilotkit-runtime';
+import { handleCopilotOptions, handleCopilotRequest } from '@/lib/copilotkit/proxy';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
 
-export const GET = handleGet;
-export const POST = handlePost;
-export const OPTIONS = handleOptions;
+export const GET = handleCopilotRequest;
+export const POST = handleCopilotRequest;
+export const DELETE = handleCopilotRequest;
+export const PATCH = handleCopilotRequest;
+export const OPTIONS = handleCopilotOptions;

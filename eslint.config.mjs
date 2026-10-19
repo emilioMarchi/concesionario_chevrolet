@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Build artifact (self-contained package with its own node_modules).
+    "runtime-deploy/**",
   ]),
 ]);
 
