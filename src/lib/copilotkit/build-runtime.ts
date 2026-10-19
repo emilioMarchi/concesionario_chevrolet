@@ -15,6 +15,7 @@ import {
 } from '@/lib/intelligence';
 import { recordVisitor } from '@/lib/leads/visitors';
 import { scheduleSync } from '@/lib/leads/auto-sync';
+import { uuid } from '@/lib/copilotkit/uuid';
 
 export const BASE_PATH = '/api/copilotkit';
 
@@ -76,7 +77,7 @@ export function buildCopilotRuntime(): CopilotRuntime {
       identifyUser: async (request: Request): Promise<CopilotRuntimeUser> => {
         const cookie = request.headers.get('cookie') ?? '';
         const match = cookie.match(new RegExp(`${ANON_USER_COOKIE}=([^;]+)`));
-        const userId = match?.[1] ?? crypto.randomUUID();
+        const userId = match?.[1] ?? uuid();
         // Fire-and-forget: no debe bloquear el handshake del runtime.
         void recordVisitor({ userId, agentId: AGENT_ID }).catch(() => {});
         return { id: userId, name: `Usuario ${userId.slice(0, 8)}` };
