@@ -1,6 +1,10 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // Deploy en el VPS: se empaqueta `.next/standalone` con sólo las dependencias
+  // trazadas, y `next start` sirve el front + API en el mismo proceso. Así la app
+  // y el runtime de CopilotKit quedan same-origin (sin CORS ni cookies cross-site).
+  output: "standalone",
   // CopilotKit v2 necesita la public API key en el cliente (provider). Como la
   // variable es `COPILOT_API_KEY` (sin prefijo NEXT_PUBLIC_), la exponemos al
   // bundle vía `env`. Es una clave pública por diseño.

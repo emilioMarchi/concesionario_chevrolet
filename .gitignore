@@ -34,10 +34,14 @@ yarn-error.log*
 .env*
 !.env.example
 !.env.runtime.example
+!.env.web.example
 
 # runtime service deploy artifacts
 /runtime-deploy/
 /runtime-deploy.tar.gz
+
+# web app deploy artifacts
+/web-deploy.tar.gz
 
 # vercel
 .vercel
