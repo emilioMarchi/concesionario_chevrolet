@@ -19,12 +19,24 @@ const nextConfig: NextConfig = {
   // firebase-admin usa require dinámico de módulos nativos; lo dejamos externo al
   // bundle del servidor para evitar warnings/errores de webpack.
   serverExternalPackages: ["firebase-admin"],
-  // `serverExternalPackages` deja el paquete externo pero NO copia todos sus
-  // archivos al `.next/standalone`. En local el `require` funciona por fallback al
-  // `node_modules` de la raíz, pero en el VPS (standalone aislado) falla con
-  // "Cannot find module 'firebase-admin/...'". Forzamos su inclusión completa.
+  // OJO: el build DEBE usar webpack (`next build --webpack`). Turbopack (default
+  // en Next 16) tiene un bug con serverExternalPackages: genera un
+  // `require('pino-<hash>')` interno que no existe en el standalone del VPS
+  // ("Failed to load external module pino-28069d5257187539"). Con webpack el
+  // trazado de fs es correcto.
+  // Refuerzo: forzamos la copia completa de firebase-admin (y su árbol) al
+  // standalone, porque el trace por sí solo dejaba sólo 18/248 archivos.
   outputFileTracingIncludes: {
-    "/api/**/*": ["./node_modules/firebase-admin/**/*"],
+    "/**/*": [
+      "./node_modules/firebase-admin/**/*",
+      "./node_modules/google-gax/**/*",
+      "./node_modules/google-auth-library/**/*",
+      "./node_modules/gcp-metadata/**/*",
+      "./node_modules/@google-cloud/**/*",
+      "./node_modules/@grpc/**/*",
+      "./node_modules/proto3-json-serializer/**/*",
+      "./node_modules/protobufjs/**/*",
+    ],
   },
 };
 
