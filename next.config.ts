@@ -19,6 +19,13 @@ const nextConfig: NextConfig = {
   // firebase-admin usa require dinámico de módulos nativos; lo dejamos externo al
   // bundle del servidor para evitar warnings/errores de webpack.
   serverExternalPackages: ["firebase-admin"],
+  // `serverExternalPackages` deja el paquete externo pero NO copia todos sus
+  // archivos al `.next/standalone`. En local el `require` funciona por fallback al
+  // `node_modules` de la raíz, pero en el VPS (standalone aislado) falla con
+  // "Cannot find module 'firebase-admin/...'". Forzamos su inclusión completa.
+  outputFileTracingIncludes: {
+    "/api/**/*": ["./node_modules/firebase-admin/**/*"],
+  },
 };
 
 export default nextConfig;

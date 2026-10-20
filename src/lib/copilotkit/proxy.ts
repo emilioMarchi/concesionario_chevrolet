@@ -1,7 +1,12 @@
 import { NextRequest } from 'next/server';
 import { buildCorsHeaders, preflightResponse } from '@/lib/cors';
 import { anonUserCookie, ANON_USER_COOKIE } from '@/lib/intelligence';
-import { handleGet } from '@/lib/copilotkit-runtime';
+import {
+  handleDelete,
+  handleGet,
+  handlePatch,
+  handlePost,
+} from '@/lib/copilotkit-runtime';
 
 const HOP_BY_HOP = new Set([
   'host',
@@ -80,7 +85,21 @@ async function proxy(req: NextRequest, base: string): Promise<Response> {
 
 export async function handleCopilotRequest(req: NextRequest): Promise<Response> {
   const base = runtimeBaseUrl();
-  if (!base) return handleGet(req);
+  // Sin COPILOT_RUNTIME_URL no hay servicio externo: el runtime corre in-process
+  // dentro del propio proceso Next (persistente en el VPS, sin tope de 60s).
+  if (!base) {
+    switch (req.method.toUpperCase()) {
+      case 'POST':
+        return handlePost(req);
+      case 'DELETE':
+        return handleDelete(req);
+      case 'PATCH':
+        return handlePatch(req);
+      case 'GET':
+      default:
+        return handleGet(req);
+    }
+  }
   return proxy(req, base);
 }
 
